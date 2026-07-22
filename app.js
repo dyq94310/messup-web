@@ -28,7 +28,6 @@ elements.templateSearch.addEventListener("input", () => { state.templateSearch =
 elements.selectedOnly.addEventListener("change", () => { state.selectedOnly = elements.selectedOnly.checked; renderTemplates(); });
 document.querySelector("#select-all-selectors").addEventListener("click", () => { state.selectors.forEach((item) => { item.selected = true; }); render(); });
 document.querySelector("#clear-selectors").addEventListener("click", () => { state.selectors.forEach((item) => { item.selected = false; }); render(); });
-document.querySelector("#clear-button").addEventListener("click", clearAll);
 elements.downloadButton.addEventListener("click", download);
 elements.copyButton.addEventListener("click", copyPreview);
 renderLineNumbers("inventory");
@@ -342,7 +341,6 @@ async function copyPreview() {
   }
 }
 
-function clearAll() { elements.inventoryInput.value = ""; elements.templateInput.value = ""; elements.templateSearch.value = ""; elements.selectedOnly.checked = false; state.inventory = null; state.template = null; state.nodes = []; state.templates = []; state.selectors = []; state.templateSearch = ""; state.selectedOnly = false; state.activeType = "all"; state.errorLines = { inventory: new Set(), template: new Set() }; parseInputs(); elements.inventoryInput.focus(); }
 function validationError(message, line, source) { return { message, line, source }; }
 function getLineText(text, line) { return text.split(/\r?\n/)[line - 1] || ""; }
 function jsonErrorLine(message) { const match = /position (\d+)/.exec(message); if (!match) return undefined; return elements.templateInput.value.slice(0, Number(match[1])).split("\n").length; }
