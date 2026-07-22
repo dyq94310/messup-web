@@ -9,8 +9,8 @@
 
    ```ini
    [lxc_nodes]
-   1.1.1.1 ansible_port=29586 deployment_env=rear singbox_name=rear
-   2.2.2.2 ansible_port=11780 deployment_env=ix singbox_name=ix
+   1.1.1.1 ansible_port=22 deployment_env=example-a singbox_name=example-a
+   2.2.2.2 ansible_port=22 deployment_env=example-b singbox_name=example-b
    ```
 
 2. 确保节点 IP 同时存在于 `[singbox_nodes]`：

@@ -14,7 +14,7 @@ const elements = {
   templateErrors: document.querySelector("#template-errors"),
   nodes: document.querySelector("#nodes"), templates: document.querySelector("#templates"), selectors: document.querySelector("#selectors"),
   nodeCount: document.querySelector("#node-count"), templateCount: document.querySelector("#template-count"), summary: document.querySelector("#summary"),
-  preview: document.querySelector("#preview"), previewStatus: document.querySelector("#preview-status"), downloadButton: document.querySelector("#download-button"),
+  preview: document.querySelector("#preview"), previewStatus: document.querySelector("#preview-status"), copyButton: document.querySelector("#copy-button"), downloadButton: document.querySelector("#download-button"),
   templateSearch: document.querySelector("#template-search"), selectedOnly: document.querySelector("#selected-only"), typeFilters: document.querySelector("#type-filters"), templateSelectionSummary: document.querySelector("#template-selection-summary"),
 };
 
@@ -30,6 +30,7 @@ document.querySelector("#select-all-selectors").addEventListener("click", () => 
 document.querySelector("#clear-selectors").addEventListener("click", () => { state.selectors.forEach((item) => { item.selected = false; }); render(); });
 document.querySelector("#clear-button").addEventListener("click", clearAll);
 elements.downloadButton.addEventListener("click", download);
+elements.copyButton.addEventListener("click", copyPreview);
 renderLineNumbers("inventory");
 renderLineNumbers("template");
 
@@ -247,11 +248,13 @@ function renderGeneratedPreview() {
     elements.summary.textContent = result.error;
     elements.preview.textContent = "生成后的 JSON 会显示在这里。";
     elements.previewStatus.textContent = "等待有效配置"; elements.previewStatus.className = "validation-state neutral"; elements.downloadButton.disabled = true;
+    elements.copyButton.disabled = true;
     return;
   }
   elements.summary.textContent = `${state.nodes.length} 台机器 × ${result.sampleCount} 个样板 = ${result.tags.length} 个新 outbound；更新 ${result.selectorCount} 个 selector。`;
   elements.preview.textContent = JSON.stringify(result.config, null, 2);
   elements.previewStatus.textContent = "已实时生成"; elements.previewStatus.className = "validation-state valid"; elements.downloadButton.disabled = false;
+  elements.copyButton.disabled = false;
 }
 
 function generate() {
@@ -296,6 +299,20 @@ function download() {
   const result = generate(); if (!result.ok) return;
   const blob = new Blob([JSON.stringify(result.config, null, 2) + "\n"], { type: "application/json" }); const url = URL.createObjectURL(blob);
   const link = document.createElement("a"); link.href = url; link.download = "config.json"; link.click(); URL.revokeObjectURL(url);
+}
+
+async function copyPreview() {
+  const result = generate();
+  if (!result.ok) return;
+  const content = JSON.stringify(result.config, null, 2);
+  try {
+    await navigator.clipboard.writeText(content);
+    elements.previewStatus.textContent = "已复制到剪贴板";
+    elements.previewStatus.className = "validation-state valid";
+  } catch {
+    elements.previewStatus.textContent = "复制失败，请手动选择 JSON";
+    elements.previewStatus.className = "validation-state invalid";
+  }
 }
 
 function clearAll() { elements.inventoryInput.value = ""; elements.templateInput.value = ""; elements.templateSearch.value = ""; elements.selectedOnly.checked = false; state.inventory = null; state.template = null; state.nodes = []; state.templates = []; state.selectors = []; state.templateSearch = ""; state.selectedOnly = false; state.activeType = "all"; state.errorLines = { inventory: new Set(), template: new Set() }; parseInputs(); elements.inventoryInput.focus(); }
