@@ -220,8 +220,10 @@ function renderTemplates() {
   renderTypeFilters();
   if (!state.templates.length) { elements.templates.className = "template-list empty-state"; elements.templates.textContent = "等待有效客户端模板。"; return; }
   const samples = state.templates.filter((sample) => {
-    const haystack = `${sample.outbound.tag} ${sample.outbound.type} ${sample.outbound.server || ""} ${sample.outbound.server_port || ""}`.toLowerCase();
-    return (!state.templateSearch || haystack.includes(state.templateSearch)) && (!state.selectedOnly || sample.selected) && (state.activeType === "all" || sample.outbound.type === state.activeType);
+    const query = state.templateSearch;
+    const port = String(sample.serverPort ?? "");
+    const matchesSearch = !query || (/^\d+$/.test(query) ? port.startsWith(query) : `${sample.outbound.tag} ${sample.outbound.type} ${sample.outbound.server || ""}`.toLowerCase().includes(query));
+    return matchesSearch && (!state.selectedOnly || sample.selected) && (state.activeType === "all" || sample.outbound.type === state.activeType);
   });
   elements.templates.className = "template-list";
   if (!samples.length) { elements.templates.className = "template-list empty-state"; elements.templates.textContent = "没有匹配的协议样板。"; return; }
