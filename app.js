@@ -82,10 +82,7 @@ function parseTemplateInput() {
     const oldSamples = new Map(state.templates.map((item) => [item.outbound.tag, item]));
     const oldSelectors = new Map(state.selectors.map((item) => [item.outbound.tag, item]));
     state.template = errors.length ? null : config;
-    state.templates = Array.isArray(config.outbounds) ? config.outbounds.filter((item) => supportedTypes.has(item.type)).map((outbound) => {
-      const previous = oldSamples.get(outbound.tag);
-      return { outbound, selected: previous?.selected || false, alias: previous?.alias || defaultAlias(outbound) };
-    }) : [];
+    state.templates = buildTemplateSamples(config.outbounds, oldSamples);
     state.selectors = Array.isArray(config.outbounds) ? config.outbounds.filter((item) => item.type === "selector").map((outbound) => ({ outbound, selected: oldSelectors.get(outbound.tag)?.selected ?? true })) : [];
     state.errorLines.template = new Set(errors.map((error) => error.line).filter(Boolean));
     setValidation("template", errors.length ? `${errors.length} 个问题` : `${state.templates.length} 个样板有效`, errors.length ? "invalid" : "valid", errors);
@@ -167,10 +164,24 @@ function validateTemplate(config, text) {
   return errors;
 }
 
-function defaultAlias(outbound) {
-  const fallback = { shadowsocks: "ss", hysteria2: "hy2", anytls: "anytls", vless: "vless", trojan: "trojan", tuic: "tuic" };
-  const suffix = String(outbound.tag || "").split("-").pop().toLowerCase();
-  return /^[a-z0-9_]+$/.test(suffix) ? suffix : fallback[outbound.type];
+function buildTemplateSamples(outbounds, previousSamples) {
+  const samples = outbounds.filter((item) => supportedTypes.has(item.type));
+  const usedAliases = new Set();
+  return samples.map((outbound) => {
+    const previous = previousSamples.get(outbound.tag);
+    const alias = previous?.alias || nextProtocolAlias(outbound.type, usedAliases);
+    usedAliases.add(alias);
+    return { outbound, selected: previous?.selected || false, alias };
+  });
+}
+
+function nextProtocolAlias(type, usedAliases) {
+  const defaults = { shadowsocks: "ss", hysteria2: "hy2", anytls: "anytls", vless: "vless", trojan: "trojan", tuic: "tuic" };
+  const base = defaults[type] || type;
+  if (!usedAliases.has(base)) return base;
+  let index = 2;
+  while (usedAliases.has(`${base}-${index}`)) index += 1;
+  return `${base}-${index}`;
 }
 
 function setValidation(kind, label, stateName, errors) {
