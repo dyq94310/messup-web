@@ -21,7 +21,7 @@
    2.2.2.2
    ```
 
-3. 在“协议样板”中勾选要批量复制的 outbound。别名根据 outbound 的协议类型默认生成：Shadowsocks 为 `ss`、Hysteria2 为 `hy2`、AnyTLS 为 `anytls`；同类型的第二个样板会自动使用 `ss-2`、`hy2-2`。也可以手动修改别名。点击样板名称会定位到上方 JSON 中的原始 outbound。
+3. 在“协议样板”中勾选要批量复制的 outbound。别名根据 outbound 的协议类型默认生成：Shadowsocks 为 `ss`、Hysteria2 为 `hy2`、AnyTLS 为 `anytls`；同类型的第二个样板会自动使用 `ss-2`、`hy2-2`。也可以手动修改别名。样板卡片中的“生成端口”可覆盖模板端口，范围为 `1-65535`。点击样板名称会定位到上方 JSON 中的原始 outbound。
 4. 勾选需要更新的 selector。有效配置会实时显示完整生成 JSON，可直接下载 `config.json`。
 
 若节点 `singbox_name=rear`，选中别名为 `ss` 与 `hy2` 的样板，会生成 `rear-ss` 和 `rear-hy2`。每个新 outbound 保留样板的端口、密码、TLS SNI 和其他协议参数，仅替换 `tag` 与 `server`。

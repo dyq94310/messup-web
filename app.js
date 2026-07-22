@@ -171,7 +171,7 @@ function buildTemplateSamples(outbounds, previousSamples) {
     const previous = previousSamples.get(outbound.tag);
     const alias = previous?.alias || nextProtocolAlias(outbound.type, usedAliases);
     usedAliases.add(alias);
-    return { outbound, selected: previous?.selected || false, alias };
+    return { outbound, selected: previous?.selected || false, alias, serverPort: previous?.serverPort ?? outbound.server_port ?? "" };
   });
 }
 
@@ -236,7 +236,11 @@ function renderTemplates() {
     const detail = document.createElement("div"); detail.className = "template-detail"; detail.textContent = `${sample.outbound.server || "无 server"}${sample.outbound.server_port ? `:${sample.outbound.server_port}` : ""}`;
     const alias = document.createElement("label"); alias.className = "alias-field"; alias.textContent = "协议别名";
     const input = document.createElement("input"); input.className = "alias-input"; input.value = sample.alias; input.setAttribute("aria-label", `${sample.outbound.tag} 的协议别名`);
-    input.addEventListener("input", () => { sample.alias = input.value.trim(); renderGeneratedPreview(); }); alias.append(input); info.append(title, detail, alias); row.append(checkbox, info); return row;
+    input.addEventListener("input", () => { sample.alias = input.value.trim(); renderGeneratedPreview(); }); alias.append(input);
+    const port = document.createElement("label"); port.className = "alias-field"; port.textContent = "生成端口";
+    const portInput = document.createElement("input"); portInput.className = "alias-input port-input"; portInput.type = "number"; portInput.min = "1"; portInput.max = "65535"; portInput.step = "1"; portInput.value = sample.serverPort; portInput.setAttribute("aria-label", `${sample.outbound.tag} 的生成端口`);
+    portInput.addEventListener("input", () => { sample.serverPort = portInput.value; renderGeneratedPreview(); }); port.append(portInput);
+    info.append(title, detail, alias, port); row.append(checkbox, info); return row;
   }));
 }
 
@@ -278,10 +282,11 @@ function generate() {
     if (!/^[A-Za-z0-9_-]+$/.test(sample.alias)) return { ok: false, error: "协议别名只能使用字母、数字、-、_。" };
     if (aliases.has(sample.alias)) return { ok: false, error: "选中的协议样板不能使用重复别名。" };
     aliases.add(sample.alias);
+    if (!/^\d+$/.test(String(sample.serverPort)) || Number(sample.serverPort) < 1 || Number(sample.serverPort) > 65535) return { ok: false, error: `${sample.outbound.tag} 的生成端口必须是 1 到 65535 的整数。` };
   }
   const tags = []; const newOutbounds = []; const tagsBySource = new Map(selected.map((sample) => [sample.outbound.tag, []]));
   for (const node of state.nodes) for (const sample of selected) {
-    const outbound = structuredClone(sample.outbound); outbound.tag = `${node.name}-${sample.alias}`; outbound.server = node.address;
+    const outbound = structuredClone(sample.outbound); outbound.tag = `${node.name}-${sample.alias}`; outbound.server = node.address; outbound.server_port = Number(sample.serverPort);
     tags.push(outbound.tag); newOutbounds.push(outbound); tagsBySource.get(sample.outbound.tag).push(outbound.tag);
   }
   const sourceTags = new Set(selected.map((sample) => sample.outbound.tag));
