@@ -31,4 +31,4 @@
 - 不要把真实的 `inventory.ini`、客户端模板或导出的 `config.json` 提交到公开的 GitHub Pages 仓库。项目的 `.gitignore` 已默认忽略常用文件名，但提交前仍应检查变更内容。
 - 此版本只解析简单的 INI 主机定义。`singbox_name` 应使用字母、数字、`-` 或 `_`，并在所有 sing-box 节点中唯一。
 - 模板中类型为 `shadowsocks`、`hysteria2`、`anytls`、`vless`、`trojan` 或 `tuic` 的 outbound 可以作为复制样板。
-- 被选中的样板将从配置中移除并替换为新生成的全部节点。被选中 selector 会使用全部新节点；例如 `urltest` 的 `outbounds` 直接引用了已选样板时，也会替换为对应新节点，避免出现悬空 tag。未选中的 outbound、DNS、route、inbounds 和其他字段将保持不变。
+- 被选中的样板将从配置中移除并替换为新生成的全部节点。如果生成的 `机器名-协议别名` 已存在于模板中的代理 outbound，会自动覆盖旧节点，避免重复 tag；旧节点的 selector 引用会继续指向同名的新节点。若同名对象是 selector、urltest、direct 等非代理 outbound，则会阻止生成并提示冲突。被选中 selector 会使用全部新节点；例如 `urltest` 的 `outbounds` 直接引用了已选样板时，也会替换为对应新节点，避免出现悬空 tag。未选中的 outbound、DNS、route、inbounds 和其他字段将保持不变。

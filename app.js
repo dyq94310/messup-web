@@ -266,7 +266,8 @@ function renderGeneratedPreview() {
     elements.copyButton.disabled = true;
     return;
   }
-  elements.summary.textContent = `${state.nodes.length} 台机器 × ${result.sampleCount} 个样板 = ${result.tags.length} 个新 outbound；更新 ${result.selectorCount} 个 selector。`;
+  const replacementNote = result.replacedTags.length ? `；覆盖 ${result.replacedTags.length} 个旧节点` : "";
+  elements.summary.textContent = `${state.nodes.length} 台机器 × ${result.sampleCount} 个样板 = ${result.tags.length} 个新 outbound；更新 ${result.selectorCount} 个 selector${replacementNote}。`;
   elements.preview.textContent = JSON.stringify(result.config, null, 2);
   elements.previewStatus.textContent = "已实时生成"; elements.previewStatus.className = "validation-state valid"; elements.downloadButton.disabled = false;
   elements.copyButton.disabled = false;
@@ -290,15 +291,25 @@ function generate() {
     tags.push(outbound.tag); newOutbounds.push(outbound); tagsBySource.get(sample.outbound.tag).push(outbound.tag);
   }
   const sourceTags = new Set(selected.map((sample) => sample.outbound.tag));
-  const retained = new Set(state.template.outbounds.filter((outbound) => !sourceTags.has(outbound.tag)).map((outbound) => outbound.tag));
-  if (tags.some((tag) => retained.has(tag))) return { ok: false, error: "生成 tag 与保留 outbound 冲突，请修改节点名或协议别名。" };
-  const config = structuredClone(state.template); config.outbounds = config.outbounds.filter((outbound) => !sourceTags.has(outbound.tag)); config.outbounds.push(...newOutbounds);
+  const generatedTypes = new Set(supportedTypes);
+  const generatedTagSet = new Set(tags);
+  const replacedTags = state.template.outbounds
+    .filter((outbound) => !sourceTags.has(outbound.tag) && generatedTagSet.has(outbound.tag))
+    .filter((outbound) => generatedTypes.has(outbound.type))
+    .map((outbound) => outbound.tag);
+  const unsafeConflicts = state.template.outbounds
+    .filter((outbound) => !sourceTags.has(outbound.tag) && generatedTagSet.has(outbound.tag))
+    .filter((outbound) => !generatedTypes.has(outbound.type))
+    .map((outbound) => `${outbound.tag}（${outbound.type || "未知类型"}）`);
+  if (unsafeConflicts.length) return { ok: false, error: `生成 tag 与非代理 outbound 冲突：${unsafeConflicts.join("、")}。请修改节点名或协议别名。` };
+  const replacedTagSet = new Set(replacedTags);
+  const config = structuredClone(state.template); config.outbounds = config.outbounds.filter((outbound) => !sourceTags.has(outbound.tag) && !replacedTagSet.has(outbound.tag)); config.outbounds.push(...newOutbounds);
   const selectedSelectors = new Set(state.selectors.filter((selector) => selector.selected).map((selector) => selector.outbound.tag));
   for (const outbound of config.outbounds) {
     if (outbound.type === "selector" && selectedSelectors.has(outbound.tag)) { outbound.outbounds = [...tags]; outbound.default = tags[0]; }
     else if (Array.isArray(outbound.outbounds)) outbound.outbounds = outbound.outbounds.flatMap((tag) => tagsBySource.get(tag) || [tag]);
   }
-  return { ok: true, config, tags, sampleCount: selected.length, selectorCount: selectedSelectors.size };
+  return { ok: true, config, tags, replacedTags, sampleCount: selected.length, selectorCount: selectedSelectors.size };
 }
 
 function focusTemplate(tag) {
