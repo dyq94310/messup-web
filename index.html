@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="在浏览器本地生成 sing-box 客户端配置" />
+    <title>Node Forge | sing-box 配置生成器</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="masthead">
+        <div>
+          <p class="eyebrow">LOCAL CONFIG WORKBENCH</p>
+          <h1>Node Forge</h1>
+          <p class="intro">粘贴 Ansible inventory 与客户端模板，实时生成完整节点配置。</p>
+        </div>
+        <p class="privacy-note">仅在当前浏览器内处理<br />刷新页面后自动清除</p>
+      </header>
+
+      <section class="editor-grid" aria-label="配置输入">
+        <div class="editor-card">
+          <div class="editor-heading">
+            <div><span class="step">01</span><h2>Inventory</h2></div>
+            <span id="inventory-status" class="validation-state neutral">等待粘贴</span>
+          </div>
+          <p>粘贴 <code>inventory.ini</code>。只读取 <code>[singbox_nodes]</code>，每台主机应定义唯一的 <code>singbox_name</code>。</p>
+          <div class="editor-frame">
+            <div id="inventory-lines" class="line-numbers" aria-hidden="true"></div>
+            <textarea id="inventory-input" class="source-editor" spellcheck="false" aria-label="Inventory INI 内容" placeholder="[lxc_nodes]\n1.1.1.1 ansible_port=22 deployment_env=us singbox_name=us-01\n\n[singbox_nodes]\n1.1.1.1"></textarea>
+          </div>
+          <div id="inventory-errors" class="validation-list"></div>
+        </div>
+        <div class="editor-card">
+          <div class="editor-heading">
+            <div><span class="step">02</span><h2>客户端模板</h2></div>
+            <span id="template-status" class="validation-state neutral">等待粘贴</span>
+          </div>
+          <p>粘贴完整 sing-box 客户端 JSON。点击下方协议样板可定位到这里对应的 outbound。</p>
+          <div class="editor-frame">
+            <div id="template-lines" class="line-numbers" aria-hidden="true"></div>
+            <textarea id="template-input" class="source-editor" spellcheck="false" aria-label="sing-box JSON 模板" placeholder="{\n  &quot;outbounds&quot;: []\n}"></textarea>
+          </div>
+          <div id="template-errors" class="validation-list"></div>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <div class="panel nodes-panel">
+          <div class="panel-heading"><div><p class="eyebrow">INVENTORY</p><h2>目标节点</h2></div><span id="node-count" class="count">0</span></div>
+          <div id="nodes" class="node-list empty-state">等待有效 inventory。</div>
+        </div>
+        <div class="panel templates-panel">
+          <div class="panel-heading"><div><p class="eyebrow">OUTBOUND SAMPLES</p><h2>协议样板</h2></div><span id="template-count" class="count">0</span></div>
+          <p class="panel-note">勾选要复制的样板。点击样板名称可在上方 JSON 中定位；别名用于生成 <code>机器名-别名</code>。</p>
+          <div class="template-tools">
+            <input id="template-search" class="template-search" type="search" placeholder="搜索 tag、服务器或端口" aria-label="搜索协议样板" />
+            <label class="selected-only"><input id="selected-only" type="checkbox" /> 仅看已选</label>
+          </div>
+          <div id="type-filters" class="type-filters" aria-label="协议筛选"></div>
+          <p id="template-selection-summary" class="template-selection-summary">已选 0 / 共 0</p>
+          <div id="templates" class="template-list empty-state">等待有效客户端模板。</div>
+        </div>
+      </section>
+
+      <section class="panel selectors-panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">ROUTING OUTPUTS</p><h2>重建 Selector</h2></div>
+          <div class="selector-actions"><button id="select-all-selectors" class="text-button" type="button">全选</button><button id="clear-selectors" class="text-button" type="button">清空</button></div>
+        </div>
+        <p class="panel-note">勾选的 selector 会使用所有新节点 tag 并更新默认节点。其他 outbound 对已选样板的直接引用也会自动重映射。</p>
+        <div id="selectors" class="selector-list empty-state">等待有效客户端模板。</div>
+      </section>
+
+      <section class="generate-bar">
+        <div id="summary" class="summary">粘贴并通过校验后，预览会自动生成。</div>
+        <div class="generate-actions"><button id="clear-button" class="secondary-button" type="button">清空全部</button><button id="download-button" class="primary-button" type="button" disabled>下载 config.json</button></div>
+      </section>
+
+      <section class="panel preview-panel">
+        <div class="panel-heading"><div><p class="eyebrow">GENERATED CONFIG</p><h2>实时生成预览</h2></div><span id="preview-status" class="validation-state neutral">等待输入</span></div>
+        <pre id="preview">生成后的 JSON 会显示在这里。</pre>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>
