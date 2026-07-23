@@ -33,7 +33,19 @@
         </div>
         <div class="editor-card">
           <div class="editor-heading">
-            <div><span class="step">02</span><h2>客户端模板</h2></div>
+            <div><span class="step">02</span><h2>端口 Profile</h2></div>
+            <span id="profiles-status" class="validation-state neutral">等待粘贴</span>
+          </div>
+          <p>粘贴服务端的 <code>singbox/port_profiles.json</code>。网页会按节点 profile 生成对应端口。</p>
+          <div class="editor-frame">
+            <div id="profiles-lines" class="line-numbers" aria-hidden="true"></div>
+            <textarea id="profiles-input" class="source-editor" spellcheck="false" aria-label="sing-box 端口 profile JSON" placeholder='{"singbox_port_profiles":{"default":{"tran":51781,"anytls":51782,"hy2":51783}}}'></textarea>
+          </div>
+          <div id="profiles-errors" class="validation-list"></div>
+        </div>
+        <div class="editor-card">
+          <div class="editor-heading">
+            <div><span class="step">03</span><h2>客户端模板</h2></div>
             <span id="template-status" class="validation-state neutral">等待粘贴</span>
           </div>
           <p>粘贴完整 sing-box 客户端 JSON。点击下方协议样板可定位到这里对应的 outbound。</p>

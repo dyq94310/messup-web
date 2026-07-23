@@ -1,16 +1,19 @@
 "use strict";
 
 const supportedTypes = new Set(["shadowsocks", "hysteria2", "anytls", "vless", "trojan", "tuic"]);
-const state = { inventory: null, template: null, nodes: [], templates: [], selectors: [], templateSearch: "", selectedOnly: false, activeType: "all", errorLines: { inventory: new Set(), template: new Set() } };
+const state = { inventory: null, profiles: null, template: null, nodes: [], templates: [], selectors: [], templateSearch: "", selectedOnly: false, activeType: "all", errorLines: { inventory: new Set(), profiles: new Set(), template: new Set() } };
 let parseTimer;
 
 const elements = {
   inventoryInput: document.querySelector("#inventory-input"),
+  profilesInput: document.querySelector("#profiles-input"),
   templateInput: document.querySelector("#template-input"),
-  inventoryLines: document.querySelector("#inventory-lines"), templateLines: document.querySelector("#template-lines"),
+  inventoryLines: document.querySelector("#inventory-lines"), profilesLines: document.querySelector("#profiles-lines"), templateLines: document.querySelector("#template-lines"),
   inventoryStatus: document.querySelector("#inventory-status"),
+  profilesStatus: document.querySelector("#profiles-status"),
   templateStatus: document.querySelector("#template-status"),
   inventoryErrors: document.querySelector("#inventory-errors"),
+  profilesErrors: document.querySelector("#profiles-errors"),
   templateErrors: document.querySelector("#template-errors"),
   nodes: document.querySelector("#nodes"), templates: document.querySelector("#templates"), selectors: document.querySelector("#selectors"),
   nodeCount: document.querySelector("#node-count"), templateCount: document.querySelector("#template-count"), summary: document.querySelector("#summary"),
@@ -18,7 +21,7 @@ const elements = {
   templateSearch: document.querySelector("#template-search"), selectedOnly: document.querySelector("#selected-only"), typeFilters: document.querySelector("#type-filters"), templateSelectionSummary: document.querySelector("#template-selection-summary"),
 };
 
-for (const kind of ["inventory", "template"]) {
+for (const kind of ["inventory", "profiles", "template"]) {
   elements[`${kind}Input`].addEventListener("input", () => { renderLineNumbers(kind); scheduleParse(); });
   elements[`${kind}Input`].addEventListener("scroll", () => { elements[`${kind}Lines`].scrollTop = elements[`${kind}Input`].scrollTop; });
   elements[`${kind}Input`].addEventListener("keyup", () => renderLineNumbers(kind));
@@ -31,6 +34,7 @@ document.querySelector("#clear-selectors").addEventListener("click", () => { sta
 elements.downloadButton.addEventListener("click", download);
 elements.copyButton.addEventListener("click", copyPreview);
 renderLineNumbers("inventory");
+renderLineNumbers("profiles");
 renderLineNumbers("template");
 
 function scheduleParse() {
@@ -40,8 +44,31 @@ function scheduleParse() {
 
 function parseInputs() {
   parseInventoryInput();
+  parseProfilesInput();
   parseTemplateInput();
   render();
+}
+
+function parseProfilesInput() {
+  const text = elements.profilesInput.value;
+  if (!text.trim()) {
+    state.profiles = null;
+    state.errorLines.profiles = new Set();
+    setValidation("profiles", "等待粘贴", "neutral", []);
+    return;
+  }
+  try {
+    const profiles = JSON.parse(text);
+    const errors = validateProfiles(profiles, text);
+    state.profiles = errors.length ? null : profiles.singbox_port_profiles;
+    state.errorLines.profiles = new Set(errors.map((error) => error.line).filter(Boolean));
+    setValidation("profiles", errors.length ? `${errors.length} 个问题` : `${Object.keys(profiles.singbox_port_profiles).length} 个 profile 有效`, errors.length ? "invalid" : "valid", errors);
+  } catch (error) {
+    state.profiles = null;
+    const line = jsonErrorLine(error.message, text);
+    state.errorLines.profiles = new Set(line ? [line] : []);
+    setValidation("profiles", "JSON 格式错误", "invalid", [{ message: error.message, line, source: line ? getLineText(text, line) : "" }]);
+  }
 }
 
 function parseInventoryInput() {
@@ -146,6 +173,23 @@ function validateNodes(nodes) {
   return errors;
 }
 
+function validateProfiles(config, text) {
+  if (!config || typeof config !== "object" || Array.isArray(config) || !config.singbox_port_profiles || typeof config.singbox_port_profiles !== "object") return [validationError("必须包含 singbox_port_profiles 对象。")];
+  const errors = [];
+  if (!config.singbox_port_profiles.default) errors.push(validationError("必须定义 default profile。"));
+  for (const [name, ports] of Object.entries(config.singbox_port_profiles)) {
+    if (!ports || typeof ports !== "object" || Array.isArray(ports)) { errors.push(validationError(`profile ${name} 必须是对象。`)); continue; }
+    const values = Object.values(ports);
+    if (new Set(values).size !== values.length) errors.push(validationError(`profile ${name} 存在重复端口。`));
+    for (const [key, port] of Object.entries(ports)) if (!Number.isInteger(port) || port < 1 || port > 65535) errors.push(validationError(`${name}.${key} 端口必须是 1 到 65535 的整数。`));
+  }
+  for (const node of state.nodes) {
+    const profile = node.variables.singbox_port_profile || "default";
+    if (!config.singbox_port_profiles[profile]) errors.push(validationError(`${node.address} 使用了不存在的 profile：${profile}。`, node.sourceLine));
+  }
+  return errors;
+}
+
 function validateTemplate(config, text) {
   if (!config || typeof config !== "object" || Array.isArray(config)) return [validationError("顶层必须是 JSON 对象。")] ;
   if (!Array.isArray(config.outbounds)) return [validationError("模板缺少 outbounds 数组。")] ;
@@ -170,8 +214,12 @@ function buildTemplateSamples(outbounds, previousSamples) {
     const previous = previousSamples.get(outbound.tag);
     const alias = previous?.alias || nextProtocolAlias(outbound.type, usedAliases);
     usedAliases.add(alias);
-    return { outbound, selected: previous?.selected || false, alias, serverPort: previous?.serverPort ?? outbound.server_port ?? "" };
+    return { outbound, selected: previous?.selected || false, alias, portKey: previous?.portKey || defaultPortKey(outbound), serverPort: outbound.server_port ?? "" };
   });
+}
+
+function defaultPortKey(outbound) {
+  return { shadowsocks: "ss", anytls: "anytls", hysteria2: "hy2" }[outbound.type] || "";
 }
 
 function nextProtocolAlias(type, usedAliases) {
@@ -238,9 +286,11 @@ function renderTemplates() {
     const alias = document.createElement("label"); alias.className = "alias-field"; alias.textContent = "协议别名";
     const input = document.createElement("input"); input.className = "alias-input"; input.value = sample.alias; input.setAttribute("aria-label", `${sample.outbound.tag} 的协议别名`);
     input.addEventListener("input", () => { sample.alias = input.value.trim(); renderGeneratedPreview(); }); alias.append(input);
-    const port = document.createElement("label"); port.className = "alias-field"; port.textContent = "生成端口";
-    const portInput = document.createElement("input"); portInput.className = "alias-input port-input"; portInput.type = "number"; portInput.min = "1"; portInput.max = "65535"; portInput.step = "1"; portInput.value = sample.serverPort; portInput.setAttribute("aria-label", `${sample.outbound.tag} 的生成端口`);
-    portInput.addEventListener("input", () => { sample.serverPort = portInput.value; renderGeneratedPreview(); }); port.append(portInput);
+    const port = document.createElement("label"); port.className = "alias-field"; port.textContent = "端口键";
+    const portInput = document.createElement("select"); portInput.className = "alias-input port-input"; portInput.setAttribute("aria-label", `${sample.outbound.tag} 的端口键`);
+    const keys = [...new Set(Object.values(state.profiles || {}).flatMap((profile) => Object.keys(profile)))];
+    portInput.replaceChildren(...keys.map((key) => { const option = document.createElement("option"); option.value = key; option.textContent = key; option.selected = key === sample.portKey; return option; }));
+    portInput.addEventListener("change", () => { sample.portKey = portInput.value; renderGeneratedPreview(); }); port.append(portInput);
     info.append(title, detail, alias, port); row.append(checkbox, info); return row;
   }));
 }
@@ -280,15 +330,19 @@ function generate() {
   const selected = state.templates.filter((sample) => sample.selected);
   if (!selected.length) return { ok: false, error: "选择至少一个协议样板后生成预览。" };
   const aliases = new Set();
+  if (!state.profiles) return { ok: false, error: "请粘贴有效的 singbox_port_profiles.json。" };
   for (const sample of selected) {
     if (!/^[A-Za-z0-9_-]+$/.test(sample.alias)) return { ok: false, error: "协议别名只能使用字母、数字、-、_。" };
     if (aliases.has(sample.alias)) return { ok: false, error: "选中的协议样板不能使用重复别名。" };
     aliases.add(sample.alias);
-    if (!/^\d+$/.test(String(sample.serverPort)) || Number(sample.serverPort) < 1 || Number(sample.serverPort) > 65535) return { ok: false, error: `${sample.outbound.tag} 的生成端口必须是 1 到 65535 的整数。` };
+    if (!sample.portKey) return { ok: false, error: `${sample.outbound.tag} 未选择端口键。` };
   }
   const tags = []; const newOutbounds = []; const tagsBySource = new Map(selected.map((sample) => [sample.outbound.tag, []]));
   for (const node of state.nodes) for (const sample of selected) {
-    const outbound = structuredClone(sample.outbound); outbound.tag = `${node.name}-${sample.alias}`; outbound.server = node.address; outbound.server_port = Number(sample.serverPort);
+    const profileName = node.variables.singbox_port_profile || "default";
+    const port = state.profiles[profileName]?.[sample.portKey];
+    if (!Number.isInteger(port)) return { ok: false, error: `${node.name} 的 profile=${profileName} 缺少端口键 ${sample.portKey}。` };
+    const outbound = structuredClone(sample.outbound); outbound.tag = `${node.name}-${sample.alias}`; outbound.server = node.address; outbound.server_port = port;
     tags.push(outbound.tag); newOutbounds.push(outbound); tagsBySource.get(sample.outbound.tag).push(outbound.tag);
   }
   const sourceTags = new Set(selected.map((sample) => sample.outbound.tag));
@@ -345,7 +399,7 @@ async function copyPreview() {
 
 function validationError(message, line, source) { return { message, line, source }; }
 function getLineText(text, line) { return text.split(/\r?\n/)[line - 1] || ""; }
-function jsonErrorLine(message) { const match = /position (\d+)/.exec(message); if (!match) return undefined; return elements.templateInput.value.slice(0, Number(match[1])).split("\n").length; }
+function jsonErrorLine(message, text = elements.templateInput.value) { const match = /position (\d+)/.exec(message); if (!match) return undefined; return text.slice(0, Number(match[1])).split("\n").length; }
 function outboundLine(text, tag, index = 0) {
   if (!tag) return undefined;
   const match = new RegExp(`"tag"\\s*:\\s*"${escapeRegex(tag)}"`).exec(text);
